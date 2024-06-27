@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/drunkleen/blum-bot/types"
 	"io"
 	"log"
 	"net"
@@ -20,36 +21,6 @@ var (
 	}
 )
 
-type requestBody struct {
-	Query string `json:"query"`
-}
-
-type responseBody struct {
-	Token struct {
-		Refresh string `json:"refresh"`
-	} `json:"token"`
-}
-
-type tokenResponseBody struct {
-	Message string `json:"message"`
-	responseBody
-}
-
-type GameClaimRequest struct {
-	GameID string `json:"gameId"`
-	Points int    `json:"points"`
-}
-
-type FriendBalance struct {
-	CanClaim       bool    `json:"canClaim"`
-	AmountForClaim float64 `json:"amountForClaim"`
-	CanClaimAt     int64   `json:"canClaimAt"`
-}
-
-type ClaimFriendBalance struct {
-	ClaimBalance float64 `json:"claimBalance"`
-}
-
 func GetNewToken(queryID string) (string, error) {
 	url := "https://gateway.blum.codes/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP"
 
@@ -63,7 +34,7 @@ func GetNewToken(queryID string) (string, error) {
 	}
 
 	// Define the data to be sent in the POST request
-	data := requestBody{Query: queryID}
+	data := types.RequestBody{Query: queryID}
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal JSON: %w", err)
@@ -97,7 +68,7 @@ func GetNewToken(queryID string) (string, error) {
 				return "", fmt.Errorf("failed to read response body: %w", err)
 			}
 
-			var response responseBody
+			var response types.ResponseBody
 			if err := json.Unmarshal(body, &response); err != nil {
 				return "", fmt.Errorf("failed to unmarshal JSON: %w", err)
 			}
@@ -150,7 +121,7 @@ func GetUserInfo(token string, queryID string) (map[string]any, error) {
 		return result, nil
 	}
 
-	var tokenResponse tokenResponseBody
+	var tokenResponse types.TokenResponseBody
 	if err := json.Unmarshal(body, &tokenResponse); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
@@ -171,45 +142,46 @@ func GetUserInfo(token string, queryID string) (map[string]any, error) {
 
 }
 
-func GetUserBalance(token string) (map[string]any, error) {
+func GetUserBalance(token string) (types.UserBalance, error) {
 	url := "https://game-domain.blum.codes/api/v1/user/balance"
 	headers := getHeaders
 	headers["Authorization"] = "Bearer " + token
 
-	for attempt := 1; attempt <= 3; attempt++ {
-		req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return types.UserBalance{}, fmt.Errorf("failed to send request: %w", err)
+	}
+
+	for key, val := range headers {
+		req.Header.Set(key, val)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return types.UserBalance{}, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
 		if err != nil {
-			return nil, fmt.Errorf("failed to send request: %w", err)
+			fmt.Printf("Error closing response body: %v\n", err)
 		}
+	}(resp.Body)
 
-		for key, val := range headers {
-			req.Header.Set(key, val)
-		}
-
-		client := &http.Client{Timeout: 5 * time.Second}
-		resp, err := client.Do(req)
+	if resp.StatusCode == http.StatusOK {
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to send request: %w", err)
+			return types.UserBalance{}, fmt.Errorf("failed to read response body: %w", err)
 		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode == http.StatusOK {
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read response body: %w", err)
-			}
-			var result map[string]any
-			if err := json.Unmarshal(body, &result); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
-			}
-			return result, nil
-
+		var result types.UserBalance
+		if err := json.Unmarshal(body, &result); err != nil {
+			return types.UserBalance{}, fmt.Errorf("failed to unmarshal JSON: %w", err)
 		}
-
-		fmt.Printf("Failed to fetch user balance, try %d\n", attempt)
+		return result, nil
 
 	}
-	return nil, fmt.Errorf("failed to get balance after 3 attempts")
+
+	return types.UserBalance{}, fmt.Errorf("failed to get balance")
 }
 
 func CheckDailyReward(token string) (map[string]any, error) {
@@ -445,7 +417,7 @@ func claimGameRequest(token, gameID string, points int) (*http.Response, error) 
 		"user-agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
 	}
 
-	payload := GameClaimRequest{
+	payload := types.GameClaimRequest{
 		GameID: gameID,
 		Points: points,
 	}
@@ -515,7 +487,7 @@ func ClaimGame(token, gameID, queryID string, points int) {
 	}
 }
 
-func CheckBalanceFriend(token string) (*FriendBalance, error) {
+func CheckBalanceFriend(token string) (types.FriendsBalance, error) {
 	url := "https://gateway.blum.codes/v1/friends/balance"
 	headers := map[string]string{
 		"Authorization":      "Bearer " + token,
@@ -535,7 +507,7 @@ func CheckBalanceFriend(token string) (*FriendBalance, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return types.FriendsBalance{}, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	for key, value := range headers {
@@ -544,23 +516,23 @@ func CheckBalanceFriend(token string) (*FriendBalance, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get friend's balance: %w", err)
+		return types.FriendsBalance{}, fmt.Errorf("failed to get friend's balance: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return types.FriendsBalance{}, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var friendBalance FriendBalance
-	if err := json.NewDecoder(resp.Body).Decode(&friendBalance); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	var friendsBalance types.FriendsBalance
+	if err := json.NewDecoder(resp.Body).Decode(&friendsBalance); err != nil {
+		return types.FriendsBalance{}, fmt.Errorf("failed to decode response: %w", err)
 	}
 
-	return &friendBalance, nil
+	return friendsBalance, nil
 }
 
-func ClaimBalanceFriend(token string) (*ClaimFriendBalance, error) {
+func ClaimBalanceFriend(token string) (bool, error) {
 	url := "https://gateway.blum.codes/v1/friends/claim"
 	headers := map[string]string{
 		"Authorization":      "Bearer " + token,
@@ -578,30 +550,30 @@ func ClaimBalanceFriend(token string) (*ClaimFriendBalance, error) {
 		"user-agent":         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte{}))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return false, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
 
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to claim friend's balance: %w", err)
+		return false, fmt.Errorf("failed to claim friend's balance: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var claimFriendBalance ClaimFriendBalance
-	if err := json.NewDecoder(resp.Body).Decode(&claimFriendBalance); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
+	//var claimFriendBalance map[string]any
+	//if err := json.NewDecoder(resp.Body).Decode(&claimFriendBalance); err != nil {
+	//	return false, fmt.Errorf("failed to decode response: %w", err)
+	//}
 
-	return &claimFriendBalance, nil
+	return true, nil
 }

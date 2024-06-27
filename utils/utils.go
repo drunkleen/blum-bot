@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -119,4 +120,23 @@ func FormatUpTime(d time.Duration) string {
 	seconds := totalSeconds % 60
 
 	return fmt.Sprintf("%dh%dm%ds", hours, minutes, seconds)
+}
+
+func ConvertStrTimestamp(timestampStr string) (string, error) {
+	// Convert the string to an integer
+	epochTime, err := strconv.ParseInt(timestampStr, 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("error converting timestamp: %w", err)
+	}
+
+	// Convert milliseconds to seconds and nanoseconds
+	seconds := epochTime / 1000
+	nanoseconds := (epochTime % 1000) * 1e6
+
+	t := time.Unix(seconds, nanoseconds)
+	const layout = "Monday, 3:04 PM"
+
+	humanReadableTime := t.Format(layout)
+
+	return humanReadableTime, nil
 }

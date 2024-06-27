@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/drunkleen/blum-bot/requests"
@@ -18,7 +16,7 @@ var (
 	checkedTasksMap map[string]bool   = map[string]bool{}
 	tokenMap        map[string]string = map[string]string{}
 	checkTaskEnable bool
-	claimReffEnable bool
+	claimRefEnable  bool
 
 	initStage bool = true
 
@@ -39,13 +37,13 @@ func init() {
 func main() {
 	utils.ClearScreen()
 	utils.PrintLogo()
-	checkTaskEnable, claimReffEnable = utils.ParseArgs()
+	checkTaskEnable, claimRefEnable = utils.ParseArgs()
 	fmt.Printf("Task: %v\n", checkTaskEnable)
-	fmt.Printf("Reff: %v\n", claimReffEnable)
+	fmt.Printf("Reff: %v\n", claimRefEnable)
 
 	queryList, err := utils.ParseQueries()
 	if err != nil {
-		log.Fatalf("QueryList Error: %v\n", err)
+		log.Fatalf(red("QueryList Error: %v\n"), err)
 	}
 
 	mainLoop(queryList)
@@ -53,16 +51,15 @@ func main() {
 
 func mainLoop(queryList []string) {
 	utils.ClearScreen()
-	for { // start infinit loop
+	for { // start infinite loop
 
 		for _, queryID := range queryList { // start query loop
 			// get Token if not exists
 			val, exists := tokenMap[queryID]
 			if !exists || val == "" {
-
 				newToken, err := requests.GetNewToken(queryID)
 				if err != nil {
-					log.Printf("Error: %v\n", err)
+					log.Printf(red("Error: %v\n"), err)
 				}
 				tokenMap[queryID] = newToken
 			}
@@ -71,10 +68,10 @@ func mainLoop(queryList []string) {
 			// fetching user info
 			userInfo, err := requests.GetUserInfo(token, queryID)
 			if err != nil {
-				log.Printf("Error: %v\n", err)
+				log.Printf(red("Error: %v\n"), err)
 			}
 			username := userInfo["username"]
-			printText += fmt.Sprintf("---\nUser: %s\n", bold(username))
+			printText += fmt.Sprintf("---\nUser: %s\n", bold(green(username)))
 			if initStage {
 				fmt.Printf("---\nUser: %s\n", bold(username))
 			}
@@ -82,34 +79,26 @@ func mainLoop(queryList []string) {
 			// fetching balance info
 			balanceInfo, err := requests.GetUserBalance(token)
 			if err != nil {
-				log.Printf("Error: %v\n", err)
+				log.Printf(red("Error: %v\n"), err)
 			}
 
-			userBalanceStr := fmt.Sprintf("%v", balanceInfo["availableBalance"])
-			userBalanceStr = strings.Replace(userBalanceStr, ",", ".", -1)
-
-			availableBalance, err := strconv.ParseFloat(userBalanceStr, 64)
-			if err != nil {
-				log.Printf("Failed to parse available balance: %v", err)
-			}
-			userBalance := fmt.Sprintf("%.1f", availableBalance)
-			printText += fmt.Sprintf("[Balance]: %v\n", bold(cyan(userBalance)))
+			printText += fmt.Sprintf("[Balance] %v\n", bold(cyan(balanceInfo.AvailableBalance)))
 			if initStage {
-				fmt.Printf("[Balance]: %v\n", bold(cyan(userBalance)))
+				fmt.Printf("[Balance] %v\n", bold(cyan(balanceInfo.AvailableBalance)))
 			}
 			// Check Daily Rewards
 			dailyRewardResponse, err := requests.CheckDailyReward(token)
 			if err != nil {
-				log.Printf("Error: %v\n", err)
+				log.Printf(red("Error: %v\n"), err)
 			}
 
 			switch dailyRewardResponse["message"] {
 			case "same day":
-				printText += fmt.Sprintf("[Daily Reward]: already claimed today\n")
+				printText += fmt.Sprintf(bold(cyan("[Daily Reward]")) + " already claimed today\n")
 			case "OK":
-				printText += fmt.Sprintf("[Daily Reward] successfully claimed!\n")
+				printText += fmt.Sprintf(bold(cyan("[Daily Reward]")) + " successfully claimed!\n")
 			default:
-				printText += fmt.Sprintf("[Daily Reward] Failed to check daily reward!\n")
+				printText += fmt.Sprintf(bold(cyan("[Daily Reward]")) + " Failed to check daily reward!\n")
 			}
 
 			if checkTaskEnable {
@@ -121,22 +110,42 @@ func mainLoop(queryList []string) {
 				}
 			}
 
-			// if claimReffEnable {
-			// 	friendBalance, err := requests.CheckBalanceFriend(token)
-			// 	if err != nil {
-			// 		log.Printf("[Referrals Balance] Failed to get friend's balance: %v\n", err)
-			// 	}
-			// }
-
-			playPasses := int(balanceInfo["playPasses"].(float64))
-			printText += fmt.Sprintf("[%v]: %v tickets\n", bold(cyan("Play Passes")), playPasses)
-
-		gameLoop:
-			for { // game loop
-
-				if playPasses <= 0 {
-					break gameLoop
+			if claimRefEnable {
+				friendsBalance, err := requests.CheckBalanceFriend(token)
+				if err != nil {
+					log.Printf(red("[Referrals Balance] Failed to get friend's balance: %v\n"), err)
 				}
+
+				printText += fmt.Sprintf(bold(cyan("[Referrals]	")))
+				printText += fmt.Sprintf(yellow("amount: %v"), friendsBalance.AmountForClaim)
+				printText += fmt.Sprintf(yellow(" | Claimable: %v"), friendsBalance.CanClaim)
+
+				var claimTime string
+				if friendsBalance.CanClaimAt != "" {
+					claimTime, err = utils.ConvertStrTimestamp(friendsBalance.CanClaimAt)
+					if err != nil {
+						log.Printf(red("[Referrals Balance] Failed to convert time: %v\n"), err)
+					}
+					printText += fmt.Sprintf(yellow(" | %v\n"), claimTime)
+				} else {
+					printText += fmt.Sprintf("\n")
+				}
+
+				if friendsBalance.CanClaim {
+					ok, err := requests.ClaimBalanceFriend(token)
+					if err != nil {
+						log.Printf(red("[Referrals] Failed to claim friend's balance: %v\n"), err)
+					}
+					if ok {
+						printText += fmt.Sprintf(bold(cyan("[Referrals]")) + " successfully claimed!\n")
+					}
+				}
+
+			}
+
+			printText += fmt.Sprintf("[%v] %v tickets\n", bold(cyan("Play Passes")), balanceInfo.PlayPasses)
+
+			for balanceInfo.PlayPasses > 0 { // game loop
 				gameResponse, err := requests.PlayGame(token)
 				if err != nil {
 					fmt.Printf("Error: %v\n", err)
@@ -147,6 +156,7 @@ func mainLoop(queryList []string) {
 				if gameId, ok := gameResponse["gameId"].(string); ok {
 					requests.ClaimGame(token, gameId, queryID, 2000)
 				}
+				balanceInfo.PlayPasses--
 
 			} // end game loop
 
@@ -154,15 +164,16 @@ func mainLoop(queryList []string) {
 
 		if initStage {
 			initStage = !initStage
+		} else {
+			time.Sleep(5 * time.Second)
 		}
-		time.Sleep(5 * time.Second)
 		utils.ClearScreen()
 		utils.PrintLogo()
 		fmt.Printf(
-			"%v\n----------- Up Time: %v -----------",
+			"%v\n------------ Up Time: %v ------------",
 			printText, yellow(utils.FormatUpTime(time.Since(startTime))),
 		)
 		printText = ""
-	} // end infinit loop
+	} // end infinite loop
 
 }

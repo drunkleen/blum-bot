@@ -87,13 +87,10 @@ func mainLoop(queryList []string) {
 				fmt.Printf("[Balance] %v\n", bold(cyan(balanceInfo.AvailableBalance)))
 			}
 
-			nextFarmingTime, err := utils.ConvertStrTimestamp(fmt.Sprintf("%d", balanceInfo.Farming.EndTime))
-			if err != nil {
-				log.Printf(red(red("Error: %v\n")), err)
-			}
+			nextFarmingTime, _ := utils.TimeLeft(balanceInfo.Farming.EndTime)
 
 			if balanceInfo.Farming.EndTime != 0 && time.Unix(balanceInfo.Farming.EndTime, 0).After(time.Now()) {
-				printText += fmt.Sprintf("["+bold(cyan("Farming"))+"] "+"next claim %v", nextFarmingTime)
+				printText += fmt.Sprintf("["+bold(cyan("Farming"))+"] "+"next claim %v remaining", nextFarmingTime)
 				printText += fmt.Sprintf(" | Earned: %v\n", balanceInfo.Farming.Balance)
 			} else {
 				ok, err := requests.ClaimFarm(token)
@@ -104,6 +101,16 @@ func mainLoop(queryList []string) {
 					printText += fmt.Sprintf("[" + bold(cyan("Farming")) + "] " + "claimed successfully!\n")
 				} else {
 					printText += fmt.Sprintf("[" + bold(cyan("Farming")) + "] " + "Failed to claim farm!\n")
+				}
+
+				ok, err = requests.StartFarm(token)
+				if err != nil {
+					log.Printf(red("Error: %v\n"), err)
+				}
+				if ok {
+					printText += fmt.Sprintf("[" + bold(cyan("Farming")) + "] " + "started farming successfully!\n")
+				} else {
+					printText += fmt.Sprintf("[" + bold(cyan("Farming")) + "] " + "Failed to start farming!\n")
 				}
 			}
 

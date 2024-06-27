@@ -140,3 +140,25 @@ func ConvertStrTimestamp(timestampStr string) (string, error) {
 
 	return humanReadableTime, nil
 }
+
+func TimeLeft(futureTimestamp int64) (string, error) {
+
+	seconds := futureTimestamp / 1000
+	nanoseconds := (futureTimestamp % 1000) * 1e6
+
+	t := time.Unix(seconds, nanoseconds)
+
+	currentTime := time.Now()
+
+	duration := t.Sub(currentTime)
+
+	if duration < 0 {
+		return "00:00:00", nil
+	}
+
+	hours := int(duration.Hours())
+	minutes := int(duration.Minutes()) % 60
+	seconds = int64(duration.Seconds()) % 60
+
+	return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds), nil
+}

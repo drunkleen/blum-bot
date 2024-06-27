@@ -605,3 +605,31 @@ func ClaimFarm(token string) (bool, error) {
 
 	return true, nil
 }
+
+func StartFarm(token string) (bool, error) {
+	url := "https://game-domain.blum.codes/api/v1/farming/start"
+	headers := getHeaders
+	headers["Authorization"] = "Bearer " + token
+
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("failed to start farm: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return true, nil
+}

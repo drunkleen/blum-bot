@@ -71,7 +71,7 @@ func mainLoop(queryList []string) {
 				log.Printf(red("Error: %v\n"), err)
 			}
 			username := userInfo["username"]
-			printText += fmt.Sprintf("---\nUser: %s\n", bold(green(username)))
+			printText += fmt.Sprintf("---\n"+"["+bold(cyan("User"))+"] "+"%s\n", bold(green(username)))
 			if initStage {
 				fmt.Printf("---\nUser: %s\n", bold(username))
 			}
@@ -82,10 +82,31 @@ func mainLoop(queryList []string) {
 				log.Printf(red("Error: %v\n"), err)
 			}
 
-			printText += fmt.Sprintf("[Balance] %v\n", bold(cyan(balanceInfo.AvailableBalance)))
+			printText += fmt.Sprintf("["+bold(cyan("Balance"))+"] "+"%v\n", balanceInfo.AvailableBalance)
 			if initStage {
 				fmt.Printf("[Balance] %v\n", bold(cyan(balanceInfo.AvailableBalance)))
 			}
+
+			nextFarmingTime, err := utils.ConvertStrTimestamp(fmt.Sprintf("%d", balanceInfo.Farming.EndTime))
+			if err != nil {
+				log.Printf(red(red("Error: %v\n")), err)
+			}
+
+			if balanceInfo.Farming.EndTime != 0 && time.Unix(balanceInfo.Farming.EndTime, 0).After(time.Now()) {
+				printText += fmt.Sprintf("["+bold(cyan("Farming"))+"] "+"next claim %v", nextFarmingTime)
+				printText += fmt.Sprintf(" | Earned: %v\n", balanceInfo.Farming.Balance)
+			} else {
+				ok, err := requests.ClaimFarm(token)
+				if err != nil {
+					log.Printf(red("Error: %v\n"), err)
+				}
+				if ok {
+					printText += fmt.Sprintf("[" + bold(cyan("Farming")) + "] " + "claimed successfully!\n")
+				} else {
+					printText += fmt.Sprintf("[" + bold(cyan("Farming")) + "] " + "Failed to claim farm!\n")
+				}
+			}
+
 			// Check Daily Rewards
 			dailyRewardResponse, err := requests.CheckDailyReward(token)
 			if err != nil {
@@ -94,11 +115,11 @@ func mainLoop(queryList []string) {
 
 			switch dailyRewardResponse["message"] {
 			case "same day":
-				printText += fmt.Sprintf(bold(cyan("[Daily Reward]")) + " already claimed today\n")
+				printText += fmt.Sprintf("[" + bold(cyan("Daily Reward")) + "] " + " already claimed today\n")
 			case "OK":
-				printText += fmt.Sprintf(bold(cyan("[Daily Reward]")) + " successfully claimed!\n")
+				printText += fmt.Sprintf("[" + bold(cyan("Daily Reward")) + "] " + " successfully claimed!\n")
 			default:
-				printText += fmt.Sprintf(bold(cyan("[Daily Reward]")) + " Failed to check daily reward!\n")
+				printText += fmt.Sprintf("[" + bold(cyan("Daily Reward")) + "] " + " Failed to check daily reward!\n")
 			}
 
 			if checkTaskEnable {
@@ -116,7 +137,7 @@ func mainLoop(queryList []string) {
 					log.Printf(red("[Referrals Balance] Failed to get friend's balance: %v\n"), err)
 				}
 
-				printText += fmt.Sprintf(bold(cyan("[Referrals]	")))
+				printText += fmt.Sprintf("[" + bold(cyan("Referrals")) + "] ")
 				printText += fmt.Sprintf(yellow("amount: %v"), friendsBalance.AmountForClaim)
 				printText += fmt.Sprintf(yellow(" | Claimable: %v"), friendsBalance.CanClaim)
 
@@ -167,11 +188,12 @@ func mainLoop(queryList []string) {
 		} else {
 			time.Sleep(5 * time.Second)
 		}
+		timeNow, _ := utils.ConvertStrTimestamp(fmt.Sprintf("%d", time.Now().Unix()))
 		utils.ClearScreen()
 		utils.PrintLogo()
 		fmt.Printf(
-			"%v\n------------ Up Time: %v ------------",
-			printText, yellow(utils.FormatUpTime(time.Since(startTime))),
+			"-------- Time: %v --------\n%v\n------------ Up Time: %v ------------",
+			timeNow, printText, yellow(utils.FormatUpTime(time.Since(startTime))),
 		)
 		printText = ""
 	} // end infinite loop

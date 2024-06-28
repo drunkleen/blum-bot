@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/drunkleen/blum-bot/requests"
@@ -140,35 +141,43 @@ func mainLoop(queryList []string) {
 
 			if claimRefEnable {
 				friendsBalance, err := requests.CheckBalanceFriend(token)
-				if err != nil {
-					log.Printf(red("[Referrals Balance] Failed to get friend's balance: %v\n"), err)
-				}
 
-				printText += fmt.Sprintf("[" + bold(cyan("Referrals")) + "] ")
-				printText += fmt.Sprintf(yellow("amount: %v"), friendsBalance.AmountForClaim)
-				printText += fmt.Sprintf(yellow(" | Claimable: %v"), friendsBalance.CanClaim)
+				if friendsBalance.AmountForClaim != "0" || friendsBalance.CanClaim {
 
-				var claimTime string
-				if friendsBalance.CanClaimAt != "" {
-					claimTime, err = utils.ConvertStrTimestamp(friendsBalance.CanClaimAt)
 					if err != nil {
-						log.Printf(red("[Referrals Balance] Failed to convert time: %v\n"), err)
+						log.Printf(red("[Referrals Balance] Failed to get friend's balance: %v\n"), err)
 					}
-					printText += fmt.Sprintf(yellow(" | %v\n"), claimTime)
-				} else {
-					printText += fmt.Sprintf("\n")
-				}
 
-				if friendsBalance.CanClaim {
-					ok, err := requests.ClaimBalanceFriend(token)
-					if err != nil {
-						log.Printf(red("[Referrals] Failed to claim friend's balance: %v\n"), err)
-					}
-					if ok {
-						printText += fmt.Sprintf(bold(cyan("[Referrals]")) + " successfully claimed!\n")
-					}
-				}
+					printText += fmt.Sprintf("[" + bold(cyan("Referrals")) + "] ")
+					printText += fmt.Sprintf(yellow("amount: %v"), friendsBalance.AmountForClaim)
+					printText += fmt.Sprintf(yellow(" | Claimable: %v"), friendsBalance.CanClaim)
 
+					var claimTime int64
+					if friendsBalance.CanClaimAt != "" {
+						claimTime, err = strconv.ParseInt(friendsBalance.CanClaimAt, 10, 64)
+						if err != nil {
+							log.Printf(red("[Referrals] Failed to parse claim time: %v\n"), err)
+						}
+						remainingClaimTime, err := utils.TimeLeft(claimTime)
+						if err != nil {
+							log.Printf(red("[Referrals] Failed to calculate remaining claim time: %v\n"), err)
+						}
+						printText += fmt.Sprintf(yellow(" | %v remaining\n"), remainingClaimTime)
+					} else {
+						printText += fmt.Sprintf("\n")
+					}
+
+					if friendsBalance.CanClaim {
+						ok, err := requests.ClaimBalanceFriend(token)
+						if err != nil {
+							log.Printf(red("[Referrals] Failed to claim friend's balance: %v\n"), err)
+						}
+						if ok {
+							printText += fmt.Sprintf(bold(cyan("[Referrals]")) + " successfully claimed!\n")
+						}
+					}
+
+				}
 			}
 
 			printText += fmt.Sprintf("[%v] %v tickets\n", bold(cyan("Play Passes")), balanceInfo.PlayPasses)
@@ -195,14 +204,13 @@ func mainLoop(queryList []string) {
 		} else {
 			time.Sleep(5 * time.Second)
 		}
-		timeNow, _ := utils.ConvertStrTimestamp(fmt.Sprintf("%d", time.Now().Unix()))
+		h, m, _ := time.Now().Clock()
 		utils.ClearScreen()
 		utils.PrintLogo()
 		fmt.Printf(
-			"-------- Time: %v --------\n%v\n------------ Up Time: %v ------------",
-			timeNow, printText, yellow(utils.FormatUpTime(time.Since(startTime))),
+			"-------- Time: %d:%d --------\n%v\n------------ Up Time: %v ------------",
+			h, m, printText, yellow(utils.FormatUpTime(time.Since(startTime))),
 		)
-		fmt.Println(time.Now().Unix())
 		printText = ""
 	} // end infinite loop
 

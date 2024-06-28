@@ -89,7 +89,7 @@ func mainLoop(queryList []string) {
 
 			nextFarmingTime, _ := utils.TimeLeft(balanceInfo.Farming.EndTime)
 
-			if balanceInfo.Farming.EndTime != 0 && time.Unix(balanceInfo.Farming.EndTime, 0).After(time.Now()) {
+			if balanceInfo.Farming.Balance != "57.6" {
 				printText += fmt.Sprintf("["+bold(cyan("Farming"))+"] "+"next claim %v remaining", nextFarmingTime)
 				printText += fmt.Sprintf(" | Earned: %v\n", balanceInfo.Farming.Balance)
 			} else {
@@ -202,6 +202,7 @@ func mainLoop(queryList []string) {
 			"-------- Time: %v --------\n%v\n------------ Up Time: %v ------------",
 			timeNow, printText, yellow(utils.FormatUpTime(time.Since(startTime))),
 		)
+		fmt.Println(time.Now().Unix())
 		printText = ""
 	} // end infinite loop
 

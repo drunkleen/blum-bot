@@ -52,7 +52,15 @@ func main() {
 
 func mainLoop(queryList []string) {
 	utils.ClearScreen()
+
+	nowTime := time.Now()
+	nextTrigger := time.Now()
+	if nextTrigger.Before(nowTime) {
+		nextTrigger = nextTrigger.Add(2 * time.Hour)
+	}
+
 	for { // start infinite loop
+		now := time.Now()
 
 		for _, queryID := range queryList { // start query loop
 			// get Token if not exists
@@ -199,12 +207,25 @@ func mainLoop(queryList []string) {
 
 		} // end queryList loop
 
+		if now.After(nextTrigger) || now.Equal(nextTrigger) {
+			for i := 0; i < 3; i++ {
+				for _, token := range tokenMap {
+					fmt.Println("\nClaiming daily reward")
+					_, err := requests.GetDailyRewards(token)
+					if err != nil {
+						fmt.Printf(red("Error: %v\n"), err)
+					}
+				}
+			}
+			nextTrigger = nextTrigger.Add(2 * time.Hour)
+		}
+
 		if initStage {
 			initStage = !initStage
 		} else {
-			time.Sleep(5 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
-		h, m, _ := time.Now().Clock()
+		h, m, _ := now.Clock()
 		utils.ClearScreen()
 		utils.PrintLogo()
 		fmt.Printf(
@@ -212,6 +233,7 @@ func mainLoop(queryList []string) {
 			h, m, printText, yellow(utils.FormatUpTime(time.Since(startTime))),
 		)
 		printText = ""
+
 	} // end infinite loop
 
 }

@@ -1,5 +1,5 @@
 build:
-	@go build -o ./bin/blumbot
+	@go build -o ./bin/blumbot-linux
 
 run: build
 	@./bin/blumbot

@@ -633,3 +633,59 @@ func StartFarm(token string) (bool, error) {
 
 	return true, nil
 }
+
+func GetDailyRewards(token string) (bool, error) {
+	url := "https://game-domain.blum.codes/api/v1/daily-reward"
+	headers := map[string]string{
+		"accept":             "application/json, text/plain, */*",
+		"accept-language":    "en-US,en;q=0.9",
+		"origin":             "https://telegram.blum.codes",
+		"priority":           "u=1, i",
+		"sec-ch-ua":          `"Microsoft Edge";v="125", "Chromium";v="125", "Not.A/Brand";v="24", "Microsoft Edge WebView2";v="125"`,
+		"sec-ch-ua-mobile":   "?0",
+		"sec-ch-ua-platform": `"Windows"`,
+		"sec-fetch-dest":     "empty",
+		"sec-fetch-mode":     "cors",
+		"sec-fetch-site":     "same-site",
+		"user-agent":         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+	}
+	headers["Authorization"] = "Bearer " + token
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create request: %w", err)
+	}
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("failed to make the request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusOK {
+
+		req, err := http.NewRequest("POST", url, nil)
+		if err != nil {
+			return false, fmt.Errorf("failed to create request: %w", err)
+		}
+		for key, value := range headers {
+			req.Header.Set(key, value)
+		}
+		client := &http.Client{Timeout: 10 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, fmt.Errorf("failed to claim reward: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			return true, nil
+		}
+
+	}
+	return false, nil
+
+}

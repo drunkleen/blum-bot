@@ -77,7 +77,15 @@ func mainLoop(queryList []string) {
 			// fetching user info
 			userInfo, err := requests.GetUserInfo(token, queryID)
 			if err != nil {
-				log.Printf(red("Error: %v\n"), err)
+				if err.Error() == "token is invalid" {
+					newToken, err := requests.GetNewToken(queryID)
+					if err != nil {
+						log.Printf(red("Error: %v\n"), err)
+					}
+					tokenMap[queryID] = newToken
+				} else {
+					log.Printf(red("Error: %v\n"), err)
+				}
 			}
 			username := userInfo["username"]
 			printText += fmt.Sprintf("---\n"+"["+bold(cyan("User"))+"] "+"%s\n", bold(green(username)))

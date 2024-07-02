@@ -127,14 +127,7 @@ func GetUserInfo(token string, queryID string) (map[string]any, error) {
 	}
 
 	if tokenResponse.Message == "Token is invalid" {
-		fmt.Println("Token is invalid, getting a new token...")
-		newToken, err := GetNewToken(queryID)
-		if err != nil {
-			fmt.Println("Failed to get new token.")
-			return nil, err
-		}
-		fmt.Println("New token obtained, try again...")
-		return GetUserInfo(newToken, queryID)
+		return nil, fmt.Errorf("token is invalid")
 	} else {
 		fmt.Println("Failed to get user information.")
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)

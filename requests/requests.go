@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/drunkleen/blum-bot/types"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/drunkleen/blum-bot/types"
 )
 
 var (
@@ -236,6 +237,8 @@ func CheckDailyReward(token string) (map[string]any, error) {
 
 func CheckTasks(token string) {
 	url := "https://game-domain.blum.codes/api/v1/tasks"
+
+	// Assuming getHeaders is a function, invoke it.
 	headers := getHeaders
 	headers["Authorization"] = "Bearer " + token
 	headers["content-length"] = "0"
@@ -247,50 +250,71 @@ func CheckTasks(token string) {
 	headers["sec-fetch-mode"] = "cors"
 	headers["sec-fetch-site"] = "same-site"
 
+	// Create a new HTTP GET request
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Printf("failed to send request: %v", err)
+		log.Printf("failed to create request: %v", err)
+		return
 	}
 
+	// Set headers for the request
 	for key, val := range headers {
 		req.Header.Set(key, val)
 	}
 
+	// Send the request
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("failed to send request: %v", err)
+		return
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Printf("Failed to read response body: %v\n", err)
+		return
 	}
 
 	if resp.StatusCode == http.StatusOK {
 		var tasks []map[string]any
 		if err := json.Unmarshal(body, &tasks); err != nil {
 			log.Printf("Failed to unmarshal JSON: %v\n", err)
+			return
 		}
-
 		for _, task := range tasks {
-			taskTitle := task["title"].(string)
-			taskStatus := task["status"].(string)
-
-			if taskStatus == "NOT_STARTED" {
-				fmt.Printf("Starting Task: %s\n", taskTitle)
-				startTask(token, task["id"].(string), taskTitle)
-				claimTask(token, task["id"].(string), taskTitle)
-			} else {
-				fmt.Printf("[Task %s | Reward: %v] %s\n", taskStatus, task["reward"], taskTitle)
-
+			taskTitle, ok := task["title"].(string)
+			if !ok {
+				continue
 			}
-
+			taskID, ok := task["id"].(string)
+			if !ok {
+				continue
+			}
+			tasksList, ok := task["tasks"].([]interface{})
+			if !ok {
+				continue
+			}
+			for _, t := range tasksList {
+				taskMap, ok := t.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				taskStatus, ok := taskMap["status"].(string)
+				if !ok {
+					continue
+				}
+				if taskStatus == "NOT_STARTED" {
+					fmt.Printf("Starting Task: %s\n", taskTitle)
+					startTask(token, taskID, taskTitle)
+					claimTask(token, taskID, taskTitle)
+				} else {
+					fmt.Printf("[Task %s | Reward: %v] %s\n", taskStatus, task["reward"], taskTitle)
+				}
+			}
 		}
-
 	}
-
 }
 
 func startTask(token, taskID, taskTitle string) {
@@ -382,7 +406,7 @@ func PlayGame(token string) (map[string]any, error) {
 		req.Header.Set(key, val)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to play the game due to connection problems: %w", err)

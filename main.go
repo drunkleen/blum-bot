@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -180,7 +181,7 @@ func mainLoop(queryList []string) {
 						}
 						printText += fmt.Sprintf(yellow(" | %v remaining\n"), remainingClaimTime)
 					} else {
-						printText += fmt.Sprintf("\n")
+						printText += "\n"
 					}
 
 					if friendsBalance.CanClaim {
@@ -207,7 +208,9 @@ func mainLoop(queryList []string) {
 				}
 
 				if gameId, ok := gameResponse["gameId"].(string); ok {
-					requests.ClaimGame(token, gameId, queryID, 2000)
+					requests.ClaimGame(token, gameId, queryID, func() int {
+						return rand.Intn(1999-1301) + 1301
+					}())
 				}
 				balanceInfo.PlayPasses--
 
@@ -231,7 +234,7 @@ func mainLoop(queryList []string) {
 		if initStage {
 			initStage = !initStage
 		} else {
-			time.Sleep(10 * time.Second)
+			time.Sleep(time.Duration(rand.Intn(3600-900)+512) * time.Second)
 		}
 		h, m, _ := now.Clock()
 		utils.ClearScreen()

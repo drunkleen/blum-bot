@@ -23,7 +23,7 @@ var (
 )
 
 func GetNewToken(queryID string) (string, error) {
-	url := "https://gateway.blum.codes/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP"
+	url := "https://user-domain.blum.codes/api/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP"
 
 	headers := map[string]string{
 		"accept":          "application/json, text/plain, */*",
@@ -284,33 +284,43 @@ func CheckTasks(token string) {
 			return
 		}
 		for _, task := range tasks {
-			taskTitle, ok := task["title"].(string)
+			subSections, ok := task["subSections"].([]interface{})
 			if !ok {
 				continue
 			}
-			taskID, ok := task["id"].(string)
-			if !ok {
-				continue
-			}
-			tasksList, ok := task["tasks"].([]interface{})
-			if !ok {
-				continue
-			}
-			for _, t := range tasksList {
-				taskMap, ok := t.(map[string]interface{})
+			for _, subSection := range subSections {
+				subSectionMap, ok := subSection.(map[string]interface{})
 				if !ok {
 					continue
 				}
-				taskStatus, ok := taskMap["status"].(string)
+				subTasks, ok := subSectionMap["tasks"].([]interface{})
 				if !ok {
 					continue
 				}
-				if taskStatus == "NOT_STARTED" {
-					fmt.Printf("Starting Task: %s\n", taskTitle)
-					startTask(token, taskID, taskTitle)
-					claimTask(token, taskID, taskTitle)
-				} else {
-					fmt.Printf("[Task %s | Reward: %v] %s\n", taskStatus, task["reward"], taskTitle)
+				for _, subTask := range subTasks {
+					subTaskMap, ok := subTask.(map[string]interface{})
+					if !ok {
+						continue
+					}
+					taskTitle, ok := subTaskMap["title"].(string)
+					if !ok {
+						continue
+					}
+					taskID, ok := subTaskMap["id"].(string)
+					if !ok {
+						continue
+					}
+					taskStatus, ok := subTaskMap["status"].(string)
+					if !ok {
+						continue
+					}
+					if taskStatus == "NOT_STARTED" {
+						fmt.Printf("Starting Task: %s\n", taskTitle)
+						startTask(token, taskID, taskTitle)
+						claimTask(token, taskID, taskTitle)
+					} else {
+						fmt.Printf("[Task %s | Reward: %v] %s\n", taskStatus, subTaskMap["reward"], taskTitle)
+					}
 				}
 			}
 		}

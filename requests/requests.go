@@ -23,7 +23,7 @@ var (
 )
 
 func GetNewToken(queryID string) (string, error) {
-	url := "https://gateway.blum.codes/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP"
+	url := "https://user-domain.blum.codes/api/v1/auth/provider/PROVIDER_TELEGRAM_MINI_APP"
 
 	headers := map[string]string{
 		"accept":          "application/json, text/plain, */*",
@@ -88,7 +88,7 @@ func GetNewToken(queryID string) (string, error) {
 }
 
 func GetUserInfo(token string, queryID string) (map[string]any, error) {
-	url := "https://gateway.blum.codes/v1/user/me"
+	url := "https://user-domain.blum.codes/api/v1/user/me"
 	headers := getHeaders
 	headers["Authorization"] = "Bearer " + token
 
